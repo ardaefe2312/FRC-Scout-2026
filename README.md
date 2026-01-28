@@ -30,4 +30,4 @@ Bu uygulama **Streamlit Cloud** üzerinde yayına alınmak üzere optimize edilm
 Bu proje **.gitignore** dosyası ile korunmaktadır. Hassas API anahtarları asla GitHub üzerinden paylaşılmaz; yalnızca Streamlit Cloud'un güvenli **Secrets** kasasında saklanır.
 
 ---
-**Geliştiren:** Arda Efe Elgay - FRC 2026 Sezonu için sevgiyle yapıldı. 🦾
+**Geliştiren:** Arda Efe Elgay - FRC 2026 Decode Sezonu için sevgiyle yapıldı. 💜👽
