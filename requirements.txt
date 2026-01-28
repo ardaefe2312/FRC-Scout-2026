@@ -3,4 +3,6 @@ gspread
 pandas
 plotly
 oauth2client
+
 google-api-python-client
+matplotlib
