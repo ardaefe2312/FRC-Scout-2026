@@ -5,9 +5,9 @@ import plotly.express as px
 from oauth2client.service_account import ServiceAccountCredentials
 import os
 
+# --- 1. BAĞLANTI AYARLARI ---
 @st.cache_resource
 def get_connections():
-    # Streamlit Cloud üzerinde "Secrets" kısmına girilen verileri kontrol eder
     if "gcp_service_account" in st.secrets:
         creds_info = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, [
@@ -15,22 +15,15 @@ def get_connections():
             'https://www.googleapis.com/auth/drive'
         ])
     else:
-        # Yerel bilgisayarda çalışırken anahtar.json dosyasını kullanır
-        .
         scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/drive']
-        try:
-            creds = ServiceAccountCredentials.from_json_keyfile_name('anahtar.json', scope)
-        except FileNotFoundError:
-            st.error("Hata: 'anahtar.json' dosyası bulunamadı. Eğer Streamlit Cloud'daysanız 'Secrets' ayarlarını yapın.")
-            return None
-            
+        creds = ServiceAccountCredentials.from_json_keyfile_name('anahtar.json', scope)
+    
     client = gspread.authorize(creds)
     spreadsheet = client.open("FRC scout")
     return spreadsheet
 
-# Bağlantıyı başlat
 doc = get_connections()
-
+# Buradan sonrası mevcut kodunla aynı devam etmeli...
 if doc:
     sheet1 = doc.sheet1 # Maç Verileri
     try:
