@@ -23,7 +23,7 @@ def get_connections():
     return spreadsheet
 
 doc = get_connections()
-# Buradan sonrası mevcut kodunla aynı devam etmeli...
+
 if doc:
     sheet1 = doc.sheet1 # Maç Verileri
     try:
@@ -58,7 +58,7 @@ with tab1:
         sheet1.append_row([t_no, m_no, auto_p, tele_p, climb_status, str(broken), str(defense)])
         st.success(f"✅ Takım {t_no} - Maç {m_no} kaydedildi!")
 
-# --- TAB 2: PIT SCOUT (TEKNİK DETAYLAR & FOTOĞRAF) ---
+#  TAB 2: PIT SCOUT (TEKNİK DETAYLAR & FOTOĞRAF)
 with tab2:
     st.title("🛠️ Pit Scouting & Robot Teknik Kimliği")
     col_f1, col_f2 = st.columns([1, 1.5])
@@ -99,7 +99,7 @@ with tab2:
             else:
                 st.info("Henüz teknik veri girilmemiş.")
 
-# --- TAB 3: AKILLI AI ANALİZ & İTTİFAK SEÇİCİ ---
+#  TAB 3: AKILLI AI ANALİZ & İTTİFAK SEÇİCİ 
 with tab3:
     st.title("🤖 Stratejik Analiz ve İttifak Motoru")
     if st.button("📊 Tüm Verileri Analiz Et", use_container_width=True):
