@@ -2,6 +2,8 @@
 
 # 🤖 FRC AI Scout  2026
 
+🚀 Uygulamaya Gitmek İçin Tıkla https://frc-scout-2026arda.streamlit.app/
+
 Bu proje, FRC (First Robotics Competition) takımları için geliştirilmiş, **Google Sheets** tabanlı, gerçek zamanlı veri girişi ve **AI destekli stratejik analiz** sunan bir Scouting uygulamasıdır.
 
 ## 🚀 Özellikler
