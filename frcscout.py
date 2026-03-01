@@ -58,15 +58,21 @@ with tab1:
         sheet1.append_row([t_no, m_no, auto_p, tele_p, climb_status, str(broken), str(defense)])
         st.success(f"✅ Takım {t_no} - Maç {m_no} kaydedildi!")
 
-#  TAB 2: PIT SCOUT (TEKNİK DETAYLAR & FOTOĞRAF)
+#  TAB 2: PIT SCOUT (TEKNİK DETAYLAR & İTTİFAK SEÇİMİ)
 with tab2:
-    st.title("🛠️ Pit Scouting & Robot Teknik Kimliği")
+    st.title("🛠️ Pit Scouting & İttifak Yönetimi")
     col_f1, col_f2 = st.columns([1, 1.5])
     
     with col_f1:
         st.subheader("📝 Teknik Özellikler")
         pit_tno = st.number_input("Takım No", min_value=1, step=1, key="pit_tno")
-        is_our_robot = st.checkbox("⭐ BU BİZİM ROBOTUMUZ")
+        
+        # --- YENİ REVİZE: İTTİFAK ROLÜ SEÇİMİ ---
+        alliance_role = st.radio(
+            "🤝 Robotun İttifak Rolü",
+            ["Rakip / Diğer", "1. Ana Robot (Biz)", "2. Partner Robot", "3. Partner Robot"],
+            help="İşbirliği yaptığınız takımları buradan işaretleyebilirsiniz."
+        )
         
         robot_type = st.radio("Robot Tipi", ["Özel Tasarım (Custom)", "Kitbot"], horizontal=True)
         
@@ -80,7 +86,8 @@ with tab2:
         
         if st.button("PİT VERİLERİNİ KAYDET", use_container_width=True, type="primary"):
             motor_str = ", ".join(motor_choice)
-            sheet2.append_row([pit_tno, "Evet" if is_our_robot else "Hayır", robot_type, weight, dimensions, drive_train, motor_str])
+            # Kayıt sütununda rol bilgisini saklıyoruz
+            sheet2.append_row([pit_tno, alliance_role, robot_type, weight, dimensions, drive_train, motor_str])
             
             if uploaded_file:
                 if not os.path.exists("robot_fotolari"): os.makedirs("robot_fotolari")
@@ -88,7 +95,7 @@ with tab2:
                     f.write(uploaded_file.getbuffer())
                 st.info("📸 Fotoğraf kaydedildi.")
             
-            st.success(f"✅ Takım {pit_tno} teknik özellikleri kaydedildi!")
+            st.success(f"✅ Takım {pit_tno} ({alliance_role}) kaydedildi!")
 
     with col_f2:
         st.subheader("📋 Kayıtlı Pit Verileri")
@@ -99,10 +106,10 @@ with tab2:
             else:
                 st.info("Henüz teknik veri girilmemiş.")
 
-#  TAB 3: AKILLI AI ANALİZ & İTTİFAK SEÇİCİ 
+#  TAB 3: AKILLI AI ANALİZ (İTTİFAK ODAKLI) 
 with tab3:
-    st.title("🤖 Stratejik Analiz ve İttifak Motoru")
-    if st.button("📊 Tüm Verileri Analiz Et", use_container_width=True):
+    st.title("🤖 İttifak Odaklı Stratejik Analiz")
+    if st.button("📊 İttifak Verilerini Analiz Et", use_container_width=True):
         match_data = sheet1.get_all_records()
         pit_data = sheet2.get_all_records()
         
@@ -120,32 +127,46 @@ with tab3:
             analiz_df['Güç_Skoru'] = (analiz_df['Otonom Puanı'] * 0.4) + (analiz_df['Teleop Puanı'] * 0.3) + (analiz_df['Climb_Score'] * 0.3) - (analiz_df['Is_Broken'] * 5)
             analiz_df = analiz_df.sort_values('Güç_Skoru', ascending=False)
 
-            bizim_robotlar = pdf[pdf.iloc[:, 1] == "Evet"]["Takım No"].values
+            # --- YENİ REVİZE: İTTİFAK ROBOTLARINI FİLTRELEME ---
+            ittifak_robotları = pdf[pdf.iloc[:, 1].str.contains("Robot", na=False)]
             
-            if len(bizim_robotlar) > 0:
-                bn = bizim_robotlar[0]
-                st.subheader(f"🚀 Kaptan Robot Analizi: Takım {bn}")
+            if not ittifak_robotları.empty:
+                st.subheader("🛡️ İttifak Grubu Analizi")
+                c_itt1, c_itt2, c_itt3 = st.columns(3)
                 
-                if bn in analiz_df.index:
-                    bizim_puan = analiz_df.loc[bn]
-                    adaylar = analiz_df.drop(bn)
-                    ihtiyaclar = {"Otonom": bizim_puan['Otonom Puanı'], "Teleop": bizim_puan['Teleop Puanı'], "Tırmanma": bizim_puan['Climb_Score']}
-                    en_zayif = min(ihtiyaclar, key=ihtiyaclar.get)
-                    st.warning(f"💡 Sizin en çok **{en_zayif}** desteğine ihtiyacınız var.")
+                # Her bir partner için analiz
+                cols = [c_itt1, c_itt2, c_itt3]
+                for i, row in enumerate(ittifak_robotları.itertuples()):
+                    if i < 3:
+                        t_no_itt = row[1]
+                        t_rol = row[2]
+                        if t_no_itt in analiz_df.index:
+                            puan = analiz_df.loc[t_no_itt, 'Güç_Skoru']
+                            cols[i].metric(label=f"{t_rol} (T-{t_no_itt})", value=f"{puan:.1f} Puan")
+                        else:
+                            cols[i].warning(f"{t_rol} (T-{t_no_itt}) henüz maça çıkmadı.")
+
+                # İttifakın en zayıf noktasını bulma (Toplam ortalama üzerinden)
+                itt_nolar = ittifak_robotları.iloc[:, 0].values
+                itt_verileri = analiz_df[analiz_df.index.isin(itt_nolar)]
+                
+                if not itt_verileri.empty:
+                    st.divider()
+                    zayif_alan = itt_verileri[['Otonom Puanı', 'Teleop Puanı', 'Climb_Score']].mean().idxmin()
+                    alan_tr = {"Otonom Puanı": "Otonom", "Teleop Puanı": "Teleop", "Climb_Score": "Tırmanma"}
                     
-                    alan_map = {"Otonom": "Otonom Puanı", "Teleop": "Teleop Puanı", "Tırmanma": "Climb_Score"}
-                    partnerler = adaylar.sort_values(alan_map[en_zayif], ascending=False).head(2)
+                    st.warning(f"💡 İttifakınızın genel olarak **{alan_tr[zayif_alan]}** desteğine ihtiyacı var.")
                     
-                    c_on1, c_on2 = st.columns(2)
-                    c_on1.success(f"🥇 **En İyi Partner:** {partnerler.index[0]}")
-                    c_on2.success(f"🥈 **Yedek Partner:** {partnerler.index[1]}")
-                else:
-                    st.warning("Kendi takımınızın henüz maç verisi girilmemiş!")
+                    # Bu zayıf alanı kapatacak en iyi 3 dış rakip (partner adayı)
+                    adaylar = analiz_df[~analiz_df.index.isin(itt_nolar)]
+                    en_iyi_destek = adaylar.sort_values(zayif_alan, ascending=False).head(3)
+                    
+                    st.success(f"🔍 İttifakınıza 4. partner olarak en uygun takımlar: {', '.join(map(str, en_iyi_destek.index.tolist()))}")
             else:
-                st.info("Kendi robotunuzu belirlemek için Pit Scout sekmesinden 'Bu Bizim Robotumuz' seçeneğini işaretleyin.")
+                st.info("İttifak partnerlerinizi belirlemek için Pit Scout sekmesinden rol seçimi yapın.")
 
             st.divider()
-            st.subheader("📊 Genel Güç Sıralaması")
+            st.subheader("📊 Genel Güç Sıralaması (Tüm Takımlar)")
             fig = px.bar(analiz_df.reset_index(), x='Takım No', y='Güç_Skoru', color='Güç_Skoru', color_continuous_scale='Viridis')
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(analiz_df.style.background_gradient(subset=['Güç_Skoru'], cmap='RdYlGn'), use_container_width=True)
