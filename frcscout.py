@@ -3,7 +3,6 @@ import gspread
 import pandas as pd
 import plotly.express as px
 from oauth2client.service_account import ServiceAccountCredentials
-import os
 
 # --- 1. BAĞLANTI AYARLARI ---
 @st.cache_resource
@@ -75,19 +74,36 @@ with tab2:
             help="İşbirliği yaptığınız takımları buradan işaretleyebilirsiniz."
         )
         
+        # --- 🛠️ DETAYLAR 🛠️ ---
+        st.divider()
+        st.subheader("🤖 Yetenekler & Savunma")
+        
+        # 1. Hangi Hub ve Hangi Tırmanma?
+        capability = st.multiselect("Neler Yapabilir?", 
+                                   ["Aktif Hub Fuel", "Pasif Hub Fuel", "Tower Tırmanma L1", "Tower Tırmanma L2", "Tower Tırmanma L3"])
+        
+        # 2. Otonom Odak Noktası
+        auto_focus = st.selectbox("Otonom Odak", ["Sadece Start Line", "Start Line + Hub Fuel", "Sadece Hub Fuel"])
+        
+        # 3. Savunma Gücü
+        defense_pot = st.slider("Savunma Potansiyeli (1-5)", 1, 5, 3)
+        
+        st.divider()
+        # -----------------------------------
+        
         robot_type = st.radio("Robot Tipi", ["Özel Tasarım (Custom)", "Kitbot"], horizontal=True)
-        weight = st.number_input("Robot Ağırlığı (kg)", min_value=0.0, step=0.1)
-        dimensions = st.text_input("Robot Boyutları (Örn: 75x75x60 cm)")
+        # weight ve dimensions buraya eklenebilir, Sheets yapınızdaki sıraya göre
         drive_train = st.selectbox("Şasi Tipi", ["Swerve", "Tank", "Mecanum", "Diğer"])
         motor_choice = st.multiselect("Kullanılan Motorlar", ["Kraken", "NEO", "Falcon 500", "CIM", "Vortex"])
         
-        # --- REVİZE: FOTOĞRAF YÜKLEME KISMI SİLİNDİ ---
+        # Fotoğraf kısmı kaldırıldı.
         
         if st.button("PİT VERİLERİNİ KAYDET", use_container_width=True, type="primary"):
             motor_str = ", ".join(motor_choice)
-            sheet2.append_row([pit_tno, alliance_role, robot_type, weight, dimensions, drive_train, motor_str])
+            cap_str = ", ".join(capability)
             
-            # --- REVİZE: FOTOĞRAF KAYDETME MANTIĞI SİLİNDİ ---
+            # --- Sheets'e yeni verilerle kayıt (Sıralama önemli!) ---
+            sheet2.append_row([pit_tno, alliance_role, cap_str, auto_focus, defense_pot, robot_type, drive_train, motor_str])
             
             st.success(f"✅ Takım {pit_tno} ({alliance_role}) kaydedildi!")
 
@@ -135,11 +151,13 @@ with tab3:
             
             analiz_df = analiz_df.sort_values('Güç_Skoru', ascending=False)
 
+            # pdf (Pit Dataframe) içindeki Rol sütunu artık 2. sütun (indeks 1)
             ittifak_robotları = pdf[pdf.iloc[:, 1].str.contains("Robot", na=False)]
             itt_nolar = ittifak_robotları.iloc[:, 0].values.tolist()
 
             if not ittifak_robotları.empty:
                 st.subheader("🛡️ Partner Bazlı Özel Analizler")
+                
                 
                 for index, row in ittifak_robotları.iterrows():
                     t_no_itt = row.iloc[0]
