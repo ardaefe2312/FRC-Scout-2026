@@ -106,10 +106,11 @@ with tab2:
             else:
                 st.info("Henüz teknik veri girilmemiş.")
 
-#  TAB 3: AKILLI AI ANALİZ (İTTİFAK ODAKLI) 
+
+# --- TAB 3: AKILLI BİREYSEL & İTTİFAK ANALİZİ ---
 with tab3:
-    st.title("🤖 İttifak Odaklı Stratejik Analiz")
-    if st.button("📊 İttifak Verilerini Analiz Et", use_container_width=True):
+    st.title("🤖 Robot Bazlı Stratejik Analiz Motoru")
+    if st.button("📊 Tüm Robotları ve İttifakı Analiz Et", use_container_width=True):
         match_data = sheet1.get_all_records()
         pit_data = sheet2.get_all_records()
         
@@ -117,58 +118,74 @@ with tab3:
             df = pd.DataFrame(match_data)
             pdf = pd.DataFrame(pit_data)
             
+            # Puanlama ve Veri Temizleme
             c_map = {"Yok":0, "Park Edildi":2, "Basamak 1":5, "Basamak 2":10, "Basamak 3":15}
             df['Climb_Score'] = df['Tırmanma'].map(c_map).fillna(0)
             df['Is_Broken'] = df.iloc[:, 5].apply(lambda x: 1 if str(x).lower() == 'true' else 0)
 
+            # Genel Analiz Tablosu
             analiz_df = df.groupby('Takım No').agg({
                 'Otonom Puanı': 'mean', 'Teleop Puanı': 'mean', 'Climb_Score': 'mean', 'Is_Broken': 'sum'
             })
             analiz_df['Güç_Skoru'] = (analiz_df['Otonom Puanı'] * 0.4) + (analiz_df['Teleop Puanı'] * 0.3) + (analiz_df['Climb_Score'] * 0.3) - (analiz_df['Is_Broken'] * 5)
             analiz_df = analiz_df.sort_values('Güç_Skoru', ascending=False)
 
-            # --- YENİ REVİZE: İTTİFAK ROBOTLARINI FİLTRELEME ---
+            # İttifak Listesini Belirleme
             ittifak_robotları = pdf[pdf.iloc[:, 1].str.contains("Robot", na=False)]
-            
+            itt_nolar = ittifak_robotları.iloc[:, 0].values.tolist()
+
             if not ittifak_robotları.empty:
-                st.subheader("🛡️ İttifak Grubu Analizi")
-                c_itt1, c_itt2, c_itt3 = st.columns(3)
-                
-                # Her bir partner için analiz
-                cols = [c_itt1, c_itt2, c_itt3]
-                for i, row in enumerate(ittifak_robotları.itertuples()):
-                    if i < 3:
-                        t_no_itt = row[1]
-                        t_rol = row[2]
+                st.subheader("🛡️ Partner Bazlı Özel Analizler")
+                st.info("Aşağıdaki kartlar, her robotun kendi eksiğini kapatacak en iyi partnerleri gösterir.")
+
+                # HER ROBOT İÇİN AYRI ANALİZ KARTI
+                for index, row in ittifak_robotları.iterrows():
+                    t_no_itt = row.iloc[0] # Takım No
+                    t_rol = row.iloc[1]    # Seçilen Rol
+                    
+                    with st.expander(f"📊 {t_rol} (Takım {t_no_itt}) Analizi", expanded=True):
                         if t_no_itt in analiz_df.index:
-                            puan = analiz_df.loc[t_no_itt, 'Güç_Skoru']
-                            cols[i].metric(label=f"{t_rol} (T-{t_no_itt})", value=f"{puan:.1f} Puan")
+                            rb_puan = analiz_df.loc[t_no_itt]
+                            
+                            # İstatistikleri Göster
+                            m1, m2, m3, m4 = st.columns(4)
+                            m1.metric("Güç Skoru", f"{rb_puan['Güç_Skoru']:.1f}")
+                            m2.write(f"**Otonom:** {rb_puan['Otonom Puanı']:.1f}")
+                            m3.write(f"**Teleop:** {rb_puan['Teleop Puanı']:.1f}")
+                            m4.write(f"**Tırmanma:** {rb_puan['Climb_Score']:.1f}")
+
+                            # Bu robotun en zayıf olduğu alanı bul
+                            alanlar = {'Otonom Puanı': rb_puan['Otonom Puanı'], 
+                                      'Teleop Puanı': rb_puan['Teleop Puanı'], 
+                                      'Climb_Score': rb_puan['Climb_Score']}
+                            en_zayif_alan = min(alanlar, key=alanlar.get)
+                            alan_isim = {"Otonom Puanı": "Otonom", "Teleop Puanı": "Teleop", "Climb_Score": "Tırmanma"}
+
+                            # İttifak dışındaki adayları filtrele
+                            adaylar = analiz_df[~analiz_df.index.isin(itt_nolar)]
+                            en_iyi_partnerler = adaylar.sort_values(en_zayif_alan, ascending=False).head(2)
+
+                            st.divider()
+                            st.write(f"🎯 **Strateji:** Takım {t_no_itt} en çok **{alan_isim[en_zayif_alan]}** alanında desteğe muhtaç.")
+                            
+                            c_p1, c_p2 = st.columns(2)
+                            c_p1.success(f"🥇 **En Uygun Partner:** Takım {en_iyi_partnerler.index[0]}")
+                            c_p2.success(f"🥈 **Yedek Partner:** Takım {en_iyi_partnerler.index[1]}")
                         else:
-                            cols[i].warning(f"{t_rol} (T-{t_no_itt}) henüz maça çıkmadı.")
+                            st.warning(f"Takım {t_no_itt} için henüz maç verisi girilmemiş.")
 
-                # İttifakın en zayıf noktasını bulma (Toplam ortalama üzerinden)
-                itt_nolar = ittifak_robotları.iloc[:, 0].values
-                itt_verileri = analiz_df[analiz_df.index.isin(itt_nolar)]
-                
-                if not itt_verileri.empty:
-                    st.divider()
-                    zayif_alan = itt_verileri[['Otonom Puanı', 'Teleop Puanı', 'Climb_Score']].mean().idxmin()
-                    alan_tr = {"Otonom Puanı": "Otonom", "Teleop Puanı": "Teleop", "Climb_Score": "Tırmanma"}
-                    
-                    st.warning(f"💡 İttifakınızın genel olarak **{alan_tr[zayif_alan]}** desteğine ihtiyacı var.")
-                    
-                    # Bu zayıf alanı kapatacak en iyi 3 dış rakip (partner adayı)
-                    adaylar = analiz_df[~analiz_df.index.isin(itt_nolar)]
-                    en_iyi_destek = adaylar.sort_values(zayif_alan, ascending=False).head(3)
-                    
-                    st.success(f"🔍 İttifakınıza 4. partner olarak en uygun takımlar: {', '.join(map(str, en_iyi_destek.index.tolist()))}")
             else:
-                st.info("İttifak partnerlerinizi belirlemek için Pit Scout sekmesinden rol seçimi yapın.")
+                st.info("Analiz için Pit Scout sekmesinden partner robotlarınızı işaretleyin.")
 
+            # Genel Görselleştirme
             st.divider()
-            st.subheader("📊 Genel Güç Sıralaması (Tüm Takımlar)")
-            fig = px.bar(analiz_df.reset_index(), x='Takım No', y='Güç_Skoru', color='Güç_Skoru', color_continuous_scale='Viridis')
+            st.subheader("📊 Tüm Takımların Güç Sıralaması")
+            fig = px.bar(analiz_df.reset_index(), x='Takım No', y='Güç_Skoru', 
+                         color='Güç_Skoru', color_continuous_scale='Viridis',
+                         title="Turnuva Geneli Performans Grafiği")
             st.plotly_chart(fig, use_container_width=True)
+            
+            st.write("📋 **Detaylı Veri Tablosu (Isı Haritalı)**")
             st.dataframe(analiz_df.style.background_gradient(subset=['Güç_Skoru'], cmap='RdYlGn'), use_container_width=True)
         else:
-            st.warning("Analiz için veri yetersiz.")
+            st.warning("Analiz yapmak için yeterli maç veya pit verisi bulunamadı.")
