@@ -149,15 +149,29 @@ with tab3:
                                      (analiz_df['Climb_Score'] * 1.5) - \
                                      (analiz_df['Is_Broken'] * 10)
             
+            # Öncelikle skorlarına göre sırala
             analiz_df = analiz_df.sort_values('Güç_Skoru', ascending=False)
 
-            # pdf (Pit Dataframe) içindeki Rol sütunu artık 2. sütun (indeks 1)
+            # --- 🛠️ EKLEDİĞİMİZ KISIM: BİZİM ROBOTUMUZU EN ÜSTE TAŞI 🛠️ ---
+            # PDF'te (Pit verilerinde) "1. Ana Robot (Biz)" olan takımın numarasını bul
+            # Sütun sırasına göre iloc[:, 1] "İttifak Rolü" sütunudur.
+            bizim_robot = pdf[pdf.iloc[:, 1] == "1. Ana Robot (Biz)"]
+            
+            if not bizim_robot.empty:
+                bizim_tno = bizim_robot.iloc[0, 0] # Takım numarası
+                if bizim_tno in analiz_df.index:
+                    # Kendi robotumuzu çıkart
+                    row = analiz_df.loc[[bizim_tno]]
+                    df_kalan = analiz_df.drop(bizim_tno)
+                    # Kendi robotumuzu başa ekle, kalanı altına concat et
+                    analiz_df = pd.concat([row, df_kalan])
+            # ------------------------------------------------------------------
+
             ittifak_robotları = pdf[pdf.iloc[:, 1].str.contains("Robot", na=False)]
             itt_nolar = ittifak_robotları.iloc[:, 0].values.tolist()
 
             if not ittifak_robotları.empty:
                 st.subheader("🛡️ Partner Bazlı Özel Analizler")
-                
                 
                 for index, row in ittifak_robotları.iterrows():
                     t_no_itt = row.iloc[0]
@@ -203,3 +217,4 @@ with tab3:
             st.dataframe(analiz_df.style.background_gradient(subset=['Güç_Skoru'], cmap='RdYlGn'), use_container_width=True)
         else:
             st.warning("Veri bekleniyor...")
+
