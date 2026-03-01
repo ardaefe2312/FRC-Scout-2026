@@ -96,7 +96,7 @@ with tab2:
         drive_train = st.selectbox("Şasi Tipi", ["Swerve", "Tank", "Mecanum", "Diğer"])
         motor_choice = st.multiselect("Kullanılan Motorlar", ["Kraken", "NEO", "Falcon 500", "CIM", "Vortex"])
         
-        # Fotoğraf kısmı kaldırıldı.
+   
         
         if st.button("PİT VERİLERİNİ KAYDET", use_container_width=True, type="primary"):
             motor_str = ", ".join(motor_choice)
@@ -149,12 +149,11 @@ with tab3:
                                      (analiz_df['Climb_Score'] * 1.5) - \
                                      (analiz_df['Is_Broken'] * 10)
             
-            # Öncelikle skorlarına göre sırala
+            # 1. ÖNCE SKORA GÖRE SIRALA
             analiz_df = analiz_df.sort_values('Güç_Skoru', ascending=False)
 
-            # --- 🛠️ EKLEDİĞİMİZ KISIM: BİZİM ROBOTUMUZU EN ÜSTE TAŞI 🛠️ ---
-            # PDF'te (Pit verilerinde) "1. Ana Robot (Biz)" olan takımın numarasını bul
-            # Sütun sırasına göre iloc[:, 1] "İttifak Rolü" sütunudur.
+            # 2. BİZİM ROBOTUMUZU EN ÜSTE TAŞI
+            # Pit verilerinde (pdf) İttifak Rolü 2. sütundur (indeks 1)
             bizim_robot = pdf[pdf.iloc[:, 1] == "1. Ana Robot (Biz)"]
             
             if not bizim_robot.empty:
@@ -165,8 +164,8 @@ with tab3:
                     df_kalan = analiz_df.drop(bizim_tno)
                     # Kendi robotumuzu başa ekle, kalanı altına concat et
                     analiz_df = pd.concat([row, df_kalan])
-            # ------------------------------------------------------------------
 
+            # Analiz için robot listesi (Bizimki dahil tümü)
             ittifak_robotları = pdf[pdf.iloc[:, 1].str.contains("Robot", na=False)]
             itt_nolar = ittifak_robotları.iloc[:, 0].values.tolist()
 
@@ -194,6 +193,7 @@ with tab3:
                             en_zayif_alan = min(alanlar, key=alanlar.get)
                             alan_isim = {"Otonom Puanı": "Otonom", "Teleop Puanı": "Teleop", "Climb_Score": "Tırmanma"}
 
+                            # Partner adayları (Bizimki ve diğer partnerler hariç)
                             adaylar = analiz_df[~analiz_df.index.isin(itt_nolar)]
                             en_iyi_partnerler = adaylar.sort_values(en_zayif_alan, ascending=False).head(2)
 
@@ -201,8 +201,10 @@ with tab3:
                             st.write(f"🎯 **Stratejik İhtiyaç:** Bu robot için en iyi partner **{alan_isim[en_zayif_alan]}** uzmanı olmalı.")
                             
                             c_p1, c_p2 = st.columns(2)
-                            c_p1.success(f"🥇 Önerilen: Takım {en_iyi_partnerler.index[0]}")
-                            c_p2.success(f"🥈 Yedek: Takım {en_iyi_partnerler.index[1]}")
+                            if not en_iyi_partnerler.empty:
+                                c_p1.success(f"🥇 Önerilen: Takım {en_iyi_partnerler.index[0]}")
+                                if len(en_iyi_partnerler) > 1:
+                                    c_p2.success(f"🥈 Yedek: Takım {en_iyi_partnerler.index[1]}")
                         else:
                             st.warning(f"Takım {t_no_itt} verisi henüz girilmedi.")
             else:
@@ -214,7 +216,7 @@ with tab3:
                          color='Güç_Skoru', color_continuous_scale='Plasma')
             st.plotly_chart(fig, use_container_width=True)
             
+            # Kendi robotumuzu tabloda vurgulamak için style kullanabiliriz
             st.dataframe(analiz_df.style.background_gradient(subset=['Güç_Skoru'], cmap='RdYlGn'), use_container_width=True)
         else:
-            st.warning("Veri bekleniyor...")
-
+            st.warning("Veri bekleniyor... (Match veya Pit verisi boş)")
