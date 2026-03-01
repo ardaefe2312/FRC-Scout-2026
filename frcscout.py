@@ -80,17 +80,14 @@ with tab2:
         dimensions = st.text_input("Robot Boyutları (Örn: 75x75x60 cm)")
         drive_train = st.selectbox("Şasi Tipi", ["Swerve", "Tank", "Mecanum", "Diğer"])
         motor_choice = st.multiselect("Kullanılan Motorlar", ["Kraken", "NEO", "Falcon 500", "CIM", "Vortex"])
-        uploaded_file = st.file_uploader("Robot Fotoğrafı", type=["jpg", "png", "jpeg"])
+        
+        # --- REVİZE: FOTOĞRAF YÜKLEME KISMI SİLİNDİ ---
         
         if st.button("PİT VERİLERİNİ KAYDET", use_container_width=True, type="primary"):
             motor_str = ", ".join(motor_choice)
             sheet2.append_row([pit_tno, alliance_role, robot_type, weight, dimensions, drive_train, motor_str])
             
-            if uploaded_file:
-                if not os.path.exists("robot_fotolari"): os.makedirs("robot_fotolari")
-                with open(f"robot_fotolari/Takim_{pit_tno}.jpg", "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                st.info("📸 Fotoğraf kaydedildi.")
+            # --- REVİZE: FOTOĞRAF KAYDETME MANTIĞI SİLİNDİ ---
             
             st.success(f"✅ Takım {pit_tno} ({alliance_role}) kaydedildi!")
 
@@ -131,7 +128,6 @@ with tab3:
             })
             
             # 2026 REBUILT KATSAYI GÜNCELLEMESİ:
-            # Otonom (x2.5), Teleop (x1.2), Climb (x1.5) - Arıza Cezası (-10)
             analiz_df['Güç_Skoru'] = (analiz_df['Otonom Puanı'] * 2.5) + \
                                      (analiz_df['Teleop Puanı'] * 1.2) + \
                                      (analiz_df['Climb_Score'] * 1.5) - \
