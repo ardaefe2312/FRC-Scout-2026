@@ -141,7 +141,7 @@ with tab3:
             
             if "gemini_api_key" in st.secrets:
                 genai.configure(api_key=st.secrets["gemini_api_key"])
-                model = genai.GenerativeModel('models/gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-pro')
                 
                 with st.spinner('Yapay zeka verileri analiz ediyor...'):
                     summary = analiz_df.head(10).to_string()
