@@ -3,7 +3,8 @@ import gspread
 import pandas as pd
 import plotly.express as px
 from oauth2client.service_account import ServiceAccountCredentials
-import google.generativeai as genai
+import requests
+import json
 
 # --- 1. BAĞLANTI AYARLARI ---
 @st.cache_resource
@@ -59,7 +60,7 @@ with tab1:
         sheet1.append_row([t_no, m_no, auto_p, tele_p, climb_status, str(broken), str(defense)])
         st.success(f"✅ Takım {t_no} - Maç {m_no} kaydedildi!")
 
-#  TAB 2: PIT SCOUT (TEKNİK DETAYLAR & İTTİFAK SEÇİMİ)
+# TAB 2: PIT SCOUT (TEKNİK DETAYLAR & İTTİFAK SEÇİMİ)
 with tab2:
     st.title("🛠️ Pit Scouting & İttifak Yönetimi")
     col_f1, col_f2 = st.columns([1, 1.5])
@@ -135,31 +136,37 @@ with tab3:
             
             analiz_df = analiz_df.sort_values('Güç_Skoru', ascending=False)
 
-            # --- AI ANALİZ EKLEMESİ (GÜNCELLENMİŞ HATA ÇÖZÜMÜ) ---
+            # --- GARANTİ AI ANALİZ BLOĞU (HTTP) ---
             st.divider()
             st.subheader("🤖 Gemini AI Stratejik Raporu")
             
             if "gemini_api_key" in st.secrets:
-                try:
-                    genai.configure(api_key=st.secrets["gemini_api_key"])
-                    # Hata 404 çözümü için model yolu 'models/' ile güncellendi
-                    model = genai.GenerativeModel('models/gemini-1.5-flash')
-                    
-                    with st.spinner('Yapay zeka verileri analiz ediyor...'):
-                        summary_data = analiz_df.head(5).to_dict()
-                        prompt = f"Sen bir FRC strateji uzmanısın. Şu verileri analiz et ve kısaca strateji öner: {str(summary_data)}"
-                        response = model.generate_content(prompt)
-                        st.info(response.text)
-                except Exception as e:
-                    st.error(f"AI Analiz Hatası: {e}")
-                    st.write("İpucu: Model ismi 'gemini-pro' olarak deneniyor...")
-                    # Yedek Model Denemesi
+                api_key = st.secrets["gemini_api_key"]
+                # Doğrudan API URL'si
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+                
+                with st.spinner('Yapay zeka verileri analiz ediyor...'):
+                    summary_text = str(analiz_df.head(5).to_dict())
+                    payload = {
+                        "contents": [{
+                            "parts": [{
+                                "text": f"Sen bir FRC strateji uzmanısın. Şu takım verilerini analiz et ve 3 maddede strateji yaz: {summary_text}"
+                            }]
+                        }]
+                    }
                     try:
-                        model_alt = genai.GenerativeModel('gemini-pro')
-                        response_alt = model_alt.generate_content("FRC Scout analizi için hazır mısın?")
-                        st.write("Yedek model aktif.")
-                    except:
-                        pass
+                        headers = {'Content-Type': 'application/json'}
+                        response = requests.post(url, headers=headers, data=json.dumps(payload))
+                        result = response.json()
+                        
+                        # API Yanıtını Çekme
+                        if 'candidates' in result:
+                            ai_text = result['candidates'][0]['content']['parts'][0]['text']
+                            st.info(ai_text)
+                        else:
+                            st.error(f"API Yanıt Hatası: {result}")
+                    except Exception as e:
+                        st.error(f"Bağlantı Hatası: {e}")
             else:
                 st.warning("AI Analizi için 'gemini_api_key' eksik.")
 
