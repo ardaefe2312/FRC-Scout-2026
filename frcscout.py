@@ -3,7 +3,7 @@ import gspread
 import pandas as pd
 import plotly.express as px
 from oauth2client.service_account import ServiceAccountCredentials
-import google.generativeai as genai  # --- YENİ EKLENDİ ---
+import google.generativeai as genai
 
 # --- 1. BAĞLANTI AYARLARI ---
 @st.cache_resource
@@ -59,7 +59,7 @@ with tab1:
         sheet1.append_row([t_no, m_no, auto_p, tele_p, climb_status, str(broken), str(defense)])
         st.success(f"✅ Takım {t_no} - Maç {m_no} kaydedildi!")
 
-# TAB 2: PIT SCOUT (TEKNİK DETAYLAR & İTTİFAK SEÇİMİ)
+#  TAB 2: PIT SCOUT (TEKNİK DETAYLAR & İTTİFAK SEÇİMİ)
 with tab2:
     st.title("🛠️ Pit Scouting & İttifak Yönetimi")
     col_f1, col_f2 = st.columns([1, 1.5])
@@ -135,25 +135,33 @@ with tab3:
             
             analiz_df = analiz_df.sort_values('Güç_Skoru', ascending=False)
 
-            # --- AI ANALİZ EKLEMESİ (SADECE BU BÖLÜM EKLENDİ) ---
+            # --- AI ANALİZ EKLEMESİ (GÜNCELLENMİŞ HATA ÇÖZÜMÜ) ---
             st.divider()
             st.subheader("🤖 Gemini AI Stratejik Raporu")
             
             if "gemini_api_key" in st.secrets:
-                genai.configure(api_key=st.secrets["gemini_api_key"])
-                model = genai.GenerativeModel('gemini-pro')
-                
-                with st.spinner('Yapay zeka verileri analiz ediyor...'):
-                    summary = analiz_df.head(10).to_string()
-                    prompt = f"FRC 2026 REBUILT sezonu verileri: {summary}. En iyi 3 takımı analiz et ve ittifak stratejisi öner."
-                    try:
+                try:
+                    genai.configure(api_key=st.secrets["gemini_api_key"])
+                    # Hata 404 çözümü için model yolu 'models/' ile güncellendi
+                    model = genai.GenerativeModel('models/gemini-1.5-flash')
+                    
+                    with st.spinner('Yapay zeka verileri analiz ediyor...'):
+                        summary_data = analiz_df.head(5).to_dict()
+                        prompt = f"Sen bir FRC strateji uzmanısın. Şu verileri analiz et ve kısaca strateji öner: {str(summary_data)}"
                         response = model.generate_content(prompt)
                         st.info(response.text)
-                    except Exception as e:
-                        st.error(f"AI Analiz Hatası: {e}")
+                except Exception as e:
+                    st.error(f"AI Analiz Hatası: {e}")
+                    st.write("İpucu: Model ismi 'gemini-pro' olarak deneniyor...")
+                    # Yedek Model Denemesi
+                    try:
+                        model_alt = genai.GenerativeModel('gemini-pro')
+                        response_alt = model_alt.generate_content("FRC Scout analizi için hazır mısın?")
+                        st.write("Yedek model aktif.")
+                    except:
+                        pass
             else:
                 st.warning("AI Analizi için 'gemini_api_key' eksik.")
-            # ---------------------------------------------------
 
             st.divider()
             st.subheader("📊 Turnuva Performans Grafiği")
