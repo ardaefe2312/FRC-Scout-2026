@@ -1,9 +1,6 @@
-
 streamlit
 pandas
 plotly
 gspread
 oauth2client
-google-api-python-client
-matplotlib
-google-generativeai>=0.3.0
+requests
