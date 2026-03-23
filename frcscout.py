@@ -127,5 +127,4 @@ with tab3:
             st.dataframe(analiz_df.style.background_gradient(subset=['Güç_Skoru'], cmap='RdYlGn'), use_container_width=True)
         else:
             st.warning("Veri bekleniyor...")
-            if "gemini_api_key" in st.secrets:
-   
+          
