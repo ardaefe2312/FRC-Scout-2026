@@ -106,23 +106,21 @@ with tab3:
             analiz_df['Güç_Skoru'] = (analiz_df['Otonom Puanı'] * 2.5) + (analiz_df['Teleop Puanı'] * 1.2) + (analiz_df['Climb_Score'] * 1.5) - (analiz_df['Is_Broken'] * 10)
             analiz_df = analiz_df.sort_values('Güç_Skoru', ascending=False)
 
-            # --- AI ANALİZ (EN STABİL HALİ) ---
+            # --- AI ANALİZ ---
             st.divider()
-            st.subheader("🤖 Gemini AI Stratejik Raporu")
+            st.subheader("🤖 AI Stratejik Raporu")
             if "groq_api_key" in st.secrets:
-    try:
-        client = Groq(api_key=st.secrets["groq_api_key"])
-        prompt = f"FRC Strateji Uzmanı olarak bu verileri yorumla ve ittifak öner: {analiz_df.head(5).to_string()}"
-        chat = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.1-8b-instant",
-        )
-        st.success("🤖 AI Stratejik Rapor:")
-        st.info(chat.choices[0].message.content)
-    except Exception as e:
-        st.error(f"Hata: {e}")
-```
-
+                try:
+                    client = Groq(api_key=st.secrets["groq_api_key"])
+                    prompt = f"FRC Strateji Uzmanı olarak bu verileri yorumla ve ittifak öner: {analiz_df.head(5).to_string()}"
+                    chat = client.chat.completions.create(
+                        messages=[{"role": "user", "content": prompt}],
+                        model="llama-3.1-8b-instant",
+                    )
+                    st.success("🤖 AI Stratejik Rapor:")
+                    st.info(chat.choices[0].message.content)
+                except Exception as e:
+                    st.error(f"Hata: {e}")
 
             st.divider()
             st.subheader("📊 Turnuva Performans Grafiği")
