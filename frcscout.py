@@ -3,7 +3,7 @@ import gspread
 import pandas as pd
 import plotly.express as px
 from oauth2client.service_account import ServiceAccountCredentials
-import google.generativeai as genai
+from groq import Groq
 
 # --- 1. BAĞLANTI AYARLARI ---
 @st.cache_resource
@@ -109,16 +109,20 @@ with tab3:
             # --- AI ANALİZ (EN STABİL HALİ) ---
             st.divider()
             st.subheader("🤖 Gemini AI Stratejik Raporu")
-            if "gemini_api_key" in st.secrets:
-                try:
-                    genai.configure(api_key=st.secrets["gemini_api_key"])
-                    # 404 Hatasını önlemek için flash modelini direkt çağırıyoruz
-                    model = genai.GenerativeModel('gemini-1.5-flash-8b')
-                    prompt = f"FRC Strateji Uzmanı olarak bu verileri yorumla: {analiz_df.head(3).to_string()}"
-                    response = model.generate_content(prompt)
-                    st.info(response.text)
-                except Exception as e:
-                    st.error(f"AI şu an meşgul, ama sayısal analiz hazır! (Hata: {e})")
+            if "groq_api_key" in st.secrets:
+    try:
+        client = Groq(api_key=st.secrets["groq_api_key"])
+        prompt = f"FRC Strateji Uzmanı olarak bu verileri yorumla ve ittifak öner: {analiz_df.head(5).to_string()}"
+        chat = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.1-8b-instant",
+        )
+        st.success("🤖 AI Stratejik Rapor:")
+        st.info(chat.choices[0].message.content)
+    except Exception as e:
+        st.error(f"Hata: {e}")
+```
+
 
             st.divider()
             st.subheader("📊 Turnuva Performans Grafiği")
