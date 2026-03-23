@@ -3,6 +3,7 @@ import gspread
 import pandas as pd
 import plotly.express as px
 from oauth2client.service_account import ServiceAccountCredentials
+import google.generativeai as genai  # --- YENİ EKLENDİ ---
 
 # --- 1. BAĞLANTI AYARLARI ---
 @st.cache_resource
@@ -48,7 +49,6 @@ with tab1:
     st.divider()
     c3, c4 = st.columns(2)
     with c3:
-        # 2026 REBUILT Tırmanma Seviyeleri ve Puan Karşılıkları
         climb_status = st.selectbox("Tırmanma (Endgame)", 
                                     ["Yok", "Park Edildi (2 Puan)", "Basamak 1 (6 Puan)", "Basamak 2 (12 Puan)", "Basamak 3 (20 Puan)"])
     with c4:
@@ -59,7 +59,7 @@ with tab1:
         sheet1.append_row([t_no, m_no, auto_p, tele_p, climb_status, str(broken), str(defense)])
         st.success(f"✅ Takım {t_no} - Maç {m_no} kaydedildi!")
 
-#  TAB 2: PIT SCOUT (TEKNİK DETAYLAR & İTTİFAK SEÇİMİ)
+# TAB 2: PIT SCOUT (TEKNİK DETAYLAR & İTTİFAK SEÇİMİ)
 with tab2:
     st.title("🛠️ Pit Scouting & İttifak Yönetimi")
     col_f1, col_f2 = st.columns([1, 1.5])
@@ -74,37 +74,24 @@ with tab2:
             help="İşbirliği yaptığınız takımları buradan işaretleyebilirsiniz."
         )
         
-        # --- 🛠️ DETAYLAR 🛠️ ---
         st.divider()
         st.subheader("🤖 Yetenekler & Savunma")
-        
-        # 1. Hangi Hub ve Hangi Tırmanma?
         capability = st.multiselect("Neler Yapabilir?", 
                                    ["Aktif Hub Fuel", "Pasif Hub Fuel", "Tower Tırmanma L1", "Tower Tırmanma L2", "Tower Tırmanma L3"])
         
-        # 2. Otonom Odak Noktası
         auto_focus = st.selectbox("Otonom Odak", ["Sadece Start Line", "Start Line + Hub Fuel", "Sadece Hub Fuel"])
-        
-        # 3. Savunma Gücü
         defense_pot = st.slider("Savunma Potansiyeli (1-5)", 1, 5, 3)
         
         st.divider()
-        # -----------------------------------
         
         robot_type = st.radio("Robot Tipi", ["Özel Tasarım (Custom)", "Kitbot"], horizontal=True)
-        # weight ve dimensions buraya eklenebilir, Sheets yapınızdaki sıraya göre
         drive_train = st.selectbox("Şasi Tipi", ["Swerve", "Tank", "Mecanum", "Diğer"])
         motor_choice = st.multiselect("Kullanılan Motorlar", ["Kraken", "NEO", "Falcon 500", "CIM", "Vortex"])
-        
-   
         
         if st.button("PİT VERİLERİNİ KAYDET", use_container_width=True, type="primary"):
             motor_str = ", ".join(motor_choice)
             cap_str = ", ".join(capability)
-            
-            # --- Sheets'e yeni verilerle kayıt (Sıralama önemli!) ---
             sheet2.append_row([pit_tno, alliance_role, cap_str, auto_focus, defense_pot, robot_type, drive_train, motor_str])
-            
             st.success(f"✅ Takım {pit_tno} ({alliance_role}) kaydedildi!")
 
     with col_f2:
@@ -127,7 +114,6 @@ with tab3:
             df = pd.DataFrame(match_data)
             pdf = pd.DataFrame(pit_data)
             
-            # 2026 Manuel Puanlama Eşleşmesi
             c_map = {
                 "Yok": 0, 
                 "Park Edildi (2 Puan)": 2, 
@@ -138,85 +124,42 @@ with tab3:
             df['Climb_Score'] = df['Tırmanma'].map(c_map).fillna(0)
             df['Is_Broken'] = df.iloc[:, 5].apply(lambda x: 1 if str(x).lower() == 'true' else 0)
 
-            # Genel Analiz Tablosu
             analiz_df = df.groupby('Takım No').agg({
                 'Otonom Puanı': 'mean', 'Teleop Puanı': 'mean', 'Climb_Score': 'mean', 'Is_Broken': 'sum'
             })
             
-            # 2026 REBUILT KATSAYI GÜNCELLEMESİ:
             analiz_df['Güç_Skoru'] = (analiz_df['Otonom Puanı'] * 2.5) + \
                                      (analiz_df['Teleop Puanı'] * 1.2) + \
                                      (analiz_df['Climb_Score'] * 1.5) - \
                                      (analiz_df['Is_Broken'] * 10)
             
-            # 1. ÖNCE SKORA GÖRE SIRALA
             analiz_df = analiz_df.sort_values('Güç_Skoru', ascending=False)
 
-            # 2. BİZİM ROBOTUMUZU EN ÜSTE TAŞI
-            # Pit verilerinde (pdf) İttifak Rolü 2. sütundur (indeks 1)
-            bizim_robot = pdf[pdf.iloc[:, 1] == "1. Ana Robot (Biz)"]
+            # --- AI ANALİZ EKLEMESİ (SADECE BU BÖLÜM EKLENDİ) ---
+            st.divider()
+            st.subheader("🤖 Gemini AI Stratejik Raporu")
             
-            if not bizim_robot.empty:
-                bizim_tno = bizim_robot.iloc[0, 0] # Takım numarası
-                if bizim_tno in analiz_df.index:
-                    # Kendi robotumuzu çıkart
-                    row = analiz_df.loc[[bizim_tno]]
-                    df_kalan = analiz_df.drop(bizim_tno)
-                    # Kendi robotumuzu başa ekle, kalanı altına concat et
-                    analiz_df = pd.concat([row, df_kalan])
-
-            # Analiz için robot listesi (Bizimki dahil tümü)
-            ittifak_robotları = pdf[pdf.iloc[:, 1].str.contains("Robot", na=False)]
-            itt_nolar = ittifak_robotları.iloc[:, 0].values.tolist()
-
-            if not ittifak_robotları.empty:
-                st.subheader("🛡️ Partner Bazlı Özel Analizler")
+            if "gemini_api_key" in st.secrets:
+                genai.configure(api_key=st.secrets["gemini_api_key"])
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                for index, row in ittifak_robotları.iterrows():
-                    t_no_itt = row.iloc[0]
-                    t_rol = row.iloc[1]
-                    
-                    with st.expander(f"📊 {t_rol} (Takım {t_no_itt}) Analizi", expanded=True):
-                        if t_no_itt in analiz_df.index:
-                            rb_puan = analiz_df.loc[t_no_itt]
-                            
-                            m1, m2, m3, m4 = st.columns(4)
-                            m1.metric("Güç Skoru", f"{rb_puan['Güç_Skoru']:.1f}")
-                            m2.write(f"**Oto. Ort:** {rb_puan['Otonom Puanı']:.1f}")
-                            m3.write(f"**Tele. Ort:** {rb_puan['Teleop Puanı']:.1f}")
-                            m4.write(f"**Climb Ort:** {rb_puan['Climb_Score']:.1f}")
-
-                            # En zayıf alan tespiti
-                            alanlar = {'Otonom Puanı': rb_puan['Otonom Puanı'], 
-                                      'Teleop Puanı': rb_puan['Teleop Puanı'], 
-                                      'Climb_Score': rb_puan['Climb_Score']}
-                            en_zayif_alan = min(alanlar, key=alanlar.get)
-                            alan_isim = {"Otonom Puanı": "Otonom", "Teleop Puanı": "Teleop", "Climb_Score": "Tırmanma"}
-
-                            # Partner adayları (Bizimki ve diğer partnerler hariç)
-                            adaylar = analiz_df[~analiz_df.index.isin(itt_nolar)]
-                            en_iyi_partnerler = adaylar.sort_values(en_zayif_alan, ascending=False).head(2)
-
-                            st.divider()
-                            st.write(f"🎯 **Stratejik İhtiyaç:** Bu robot için en iyi partner **{alan_isim[en_zayif_alan]}** uzmanı olmalı.")
-                            
-                            c_p1, c_p2 = st.columns(2)
-                            if not en_iyi_partnerler.empty:
-                                c_p1.success(f"🥇 Önerilen: Takım {en_iyi_partnerler.index[0]}")
-                                if len(en_iyi_partnerler) > 1:
-                                    c_p2.success(f"🥈 Yedek: Takım {en_iyi_partnerler.index[1]}")
-                        else:
-                            st.warning(f"Takım {t_no_itt} verisi henüz girilmedi.")
+                with st.spinner('Yapay zeka verileri analiz ediyor...'):
+                    summary = analiz_df.head(10).to_string()
+                    prompt = f"FRC 2026 REBUILT sezonu verileri: {summary}. En iyi 3 takımı analiz et ve ittifak stratejisi öner."
+                    try:
+                        response = model.generate_content(prompt)
+                        st.info(response.text)
+                    except Exception as e:
+                        st.error(f"AI Analiz Hatası: {e}")
             else:
-                st.info("Pit Scout sekmesinden partnerlerinizi işaretleyin.")
+                st.warning("AI Analizi için 'gemini_api_key' eksik.")
+            # ---------------------------------------------------
 
             st.divider()
-            st.subheader("📊 2026 Turnuva Performans Grafiği")
+            st.subheader("📊 Turnuva Performans Grafiği")
             fig = px.bar(analiz_df.reset_index(), x='Takım No', y='Güç_Skoru', 
                          color='Güç_Skoru', color_continuous_scale='Plasma')
             st.plotly_chart(fig, use_container_width=True)
-            
-            # Kendi robotumuzu tabloda vurgulamak için style kullanabiliriz
             st.dataframe(analiz_df.style.background_gradient(subset=['Güç_Skoru'], cmap='RdYlGn'), use_container_width=True)
         else:
             st.warning("Veri bekleniyor... (Match veya Pit verisi boş)")
