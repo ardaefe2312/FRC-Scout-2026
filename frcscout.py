@@ -113,7 +113,7 @@ with tab3:
                 try:
                     genai.configure(api_key=st.secrets["gemini_api_key"])
                     # 404 Hatasını önlemek için flash modelini direkt çağırıyoruz
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    model = genai.GenerativeModel('gemini-2.0-flash')
                     prompt = f"FRC Strateji Uzmanı olarak bu verileri yorumla: {analiz_df.head(3).to_string()}"
                     response = model.generate_content(prompt)
                     st.info(response.text)
@@ -127,3 +127,5 @@ with tab3:
             st.dataframe(analiz_df.style.background_gradient(subset=['Güç_Skoru'], cmap='RdYlGn'), use_container_width=True)
         else:
             st.warning("Veri bekleniyor...")
+            if "gemini_api_key" in st.secrets:
+   
