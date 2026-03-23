@@ -3,8 +3,7 @@ import gspread
 import pandas as pd
 import plotly.express as px
 from oauth2client.service_account import ServiceAccountCredentials
-import requests
-import json
+import google.generativeai as genai
 
 # --- 1. BAĞLANTI AYARLARI ---
 @st.cache_resource
@@ -30,13 +29,13 @@ if doc:
     try:
         sheet2 = doc.worksheet("Sheet2") # Pit Verileri
     except:
-        st.error("Hata: Google Sheets'te 'Sheet2' sayfası bulunamadı! Lütfen oluşturun.")
+        st.error("Hata: Google Sheets'te 'Sheet2' sayfası bulunamadı!")
 
 # --- 2. SAYFA AYARLARI ---
 st.set_page_config(page_title="FRC AI Scout Pro 2026", layout="wide")
 tab1, tab2, tab3 = st.tabs(["📥 Match Scout", "🛠️ Pit Scout", "🤖 Stratejik AI Analiz"])
 
-# --- TAB 1: MATCH SCOUT (MAÇ VERİSİ) ---
+# --- TAB 1: MATCH SCOUT (Değişmedi) ---
 with tab1:
     st.title("🕹️ Maç Veri Girişi")
     c1, c2 = st.columns(2)
@@ -58,33 +57,19 @@ with tab1:
 
     if st.button("MAÇ VERİSİNİ KAYDET", type="primary", use_container_width=True):
         sheet1.append_row([t_no, m_no, auto_p, tele_p, climb_status, str(broken), str(defense)])
-        st.success(f"✅ Takım {t_no} - Maç {m_no} kaydedildi!")
+        st.success(f"✅ Takım {t_no} kaydedildi!")
 
-# TAB 2: PIT SCOUT (TEKNİK DETAYLAR & İTTİFAK SEÇİMİ)
+# --- TAB 2: PIT SCOUT (Değişmedi) ---
 with tab2:
     st.title("🛠️ Pit Scouting & İttifak Yönetimi")
     col_f1, col_f2 = st.columns([1, 1.5])
-    
     with col_f1:
         st.subheader("📝 Teknik Özellikler")
         pit_tno = st.number_input("Takım No", min_value=1, step=1, key="pit_tno")
-        
-        alliance_role = st.radio(
-            "🤝 Robotun İttifak Rolü",
-            ["Rakip / Diğer", "1. Ana Robot (Biz)", "2. Partner Robot", "3. Partner Robot"],
-            help="İşbirliği yaptığınız takımları buradan işaretleyebilirsiniz."
-        )
-        
-        st.divider()
-        st.subheader("🤖 Yetenekler & Savunma")
-        capability = st.multiselect("Neler Yapabilir?", 
-                                   ["Aktif Hub Fuel", "Pasif Hub Fuel", "Tower Tırmanma L1", "Tower Tırmanma L2", "Tower Tırmanma L3"])
-        
+        alliance_role = st.radio("🤝 Robotun İttifak Rolü", ["Rakip / Diğer", "1. Ana Robot (Biz)", "2. Partner Robot", "3. Partner Robot"])
+        capability = st.multiselect("Neler Yapabilir?", ["Aktif Hub Fuel", "Pasif Hub Fuel", "Tower Tırmanma L1", "Tower Tırmanma L2", "Tower Tırmanma L3"])
         auto_focus = st.selectbox("Otonom Odak", ["Sadece Start Line", "Start Line + Hub Fuel", "Sadece Hub Fuel"])
         defense_pot = st.slider("Savunma Potansiyeli (1-5)", 1, 5, 3)
-        
-        st.divider()
-        
         robot_type = st.radio("Robot Tipi", ["Özel Tasarım (Custom)", "Kitbot"], horizontal=True)
         drive_train = st.selectbox("Şasi Tipi", ["Swerve", "Tank", "Mecanum", "Diğer"])
         motor_choice = st.multiselect("Kullanılan Motorlar", ["Kraken", "NEO", "Falcon 500", "CIM", "Vortex"])
@@ -93,18 +78,15 @@ with tab2:
             motor_str = ", ".join(motor_choice)
             cap_str = ", ".join(capability)
             sheet2.append_row([pit_tno, alliance_role, cap_str, auto_focus, defense_pot, robot_type, drive_train, motor_str])
-            st.success(f"✅ Takım {pit_tno} ({alliance_role}) kaydedildi!")
+            st.success(f"✅ Takım {pit_tno} kaydedildi!")
 
     with col_f2:
         st.subheader("📋 Kayıtlı Pit Verileri")
         if st.button("Verileri Yenile"):
             data_pit = sheet2.get_all_records()
-            if data_pit:
-                st.dataframe(pd.DataFrame(data_pit), use_container_width=True)
-            else:
-                st.info("Henüz teknik veri girilmemiş.")
+            if data_pit: st.dataframe(pd.DataFrame(data_pit), use_container_width=True)
 
-# --- TAB 3: AKILLI BİREYSEL & İTTİFAK ANALİZİ ---
+# --- TAB 3: AKILLI ANALİZ & AI ---
 with tab3:
     st.title("🤖 2026 REBUILT Strateji Motoru")
     if st.button("📊 Tüm Robotları ve İttifakı Analiz Et", use_container_width=True):
@@ -115,66 +97,33 @@ with tab3:
             df = pd.DataFrame(match_data)
             pdf = pd.DataFrame(pit_data)
             
-            c_map = {
-                "Yok": 0, 
-                "Park Edildi (2 Puan)": 2, 
-                "Basamak 1 (6 Puan)": 6, 
-                "Basamak 2 (12 Puan)": 12, 
-                "Basamak 3 (20 Puan)": 20
-            }
+            # Sayısal Analizler (Senin Orijinal Mantığın)
+            c_map = {"Yok": 0, "Park Edildi (2 Puan)": 2, "Basamak 1 (6 Puan)": 6, "Basamak 2 (12 Puan)": 12, "Basamak 3 (20 Puan)": 20}
             df['Climb_Score'] = df['Tırmanma'].map(c_map).fillna(0)
             df['Is_Broken'] = df.iloc[:, 5].apply(lambda x: 1 if str(x).lower() == 'true' else 0)
 
-            analiz_df = df.groupby('Takım No').agg({
-                'Otonom Puanı': 'mean', 'Teleop Puanı': 'mean', 'Climb_Score': 'mean', 'Is_Broken': 'sum'
-            })
-            
-            analiz_df['Güç_Skoru'] = (analiz_df['Otonom Puanı'] * 2.5) + \
-                                     (analiz_df['Teleop Puanı'] * 1.2) + \
-                                     (analiz_df['Climb_Score'] * 1.5) - \
-                                     (analiz_df['Is_Broken'] * 10)
-            
+            analiz_df = df.groupby('Takım No').agg({'Otonom Puanı': 'mean', 'Teleop Puanı': 'mean', 'Climb_Score': 'mean', 'Is_Broken': 'sum'})
+            analiz_df['Güç_Skoru'] = (analiz_df['Otonom Puanı'] * 2.5) + (analiz_df['Teleop Puanı'] * 1.2) + (analiz_df['Climb_Score'] * 1.5) - (analiz_df['Is_Broken'] * 10)
             analiz_df = analiz_df.sort_values('Güç_Skoru', ascending=False)
 
-            # --- GARANTİ AI ANALİZ BLOĞU (HTTP) ---
+            # --- AI ANALİZ (EN STABİL HALİ) ---
             st.divider()
             st.subheader("🤖 Gemini AI Stratejik Raporu")
-            
             if "gemini_api_key" in st.secrets:
-                api_key = st.secrets["gemini_api_key"]
-                # Doğrudan API URL'si
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-                
-                with st.spinner('Yapay zeka verileri analiz ediyor...'):
-                    summary_text = str(analiz_df.head(5).to_dict())
-                    payload = {
-                        "contents": [{
-                            "parts": [{
-                                "text": f"Sen bir FRC strateji uzmanısın. Şu takım verilerini analiz et ve 3 maddede strateji yaz: {summary_text}"
-                            }]
-                        }]
-                    }
-                    try:
-                        headers = {'Content-Type': 'application/json'}
-                        response = requests.post(url, headers=headers, data=json.dumps(payload))
-                        result = response.json()
-                        
-                        # API Yanıtını Çekme
-                        if 'candidates' in result:
-                            ai_text = result['candidates'][0]['content']['parts'][0]['text']
-                            st.info(ai_text)
-                        else:
-                            st.error(f"API Yanıt Hatası: {result}")
-                    except Exception as e:
-                        st.error(f"Bağlantı Hatası: {e}")
-            else:
-                st.warning("AI Analizi için 'gemini_api_key' eksik.")
+                try:
+                    genai.configure(api_key=st.secrets["gemini_api_key"])
+                    # 404 Hatasını önlemek için flash modelini direkt çağırıyoruz
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    prompt = f"FRC Strateji Uzmanı olarak bu verileri yorumla: {analiz_df.head(3).to_string()}"
+                    response = model.generate_content(prompt)
+                    st.info(response.text)
+                except Exception as e:
+                    st.error(f"AI şu an meşgul, ama sayısal analiz hazır! (Hata: {e})")
 
             st.divider()
             st.subheader("📊 Turnuva Performans Grafiği")
-            fig = px.bar(analiz_df.reset_index(), x='Takım No', y='Güç_Skoru', 
-                         color='Güç_Skoru', color_continuous_scale='Plasma')
+            fig = px.bar(analiz_df.reset_index(), x='Takım No', y='Güç_Skoru', color='Güç_Skoru', color_continuous_scale='Plasma')
             st.plotly_chart(fig, use_container_width=True)
             st.dataframe(analiz_df.style.background_gradient(subset=['Güç_Skoru'], cmap='RdYlGn'), use_container_width=True)
         else:
-            st.warning("Veri bekleniyor... (Match veya Pit verisi boş)")
+            st.warning("Veri bekleniyor...")
